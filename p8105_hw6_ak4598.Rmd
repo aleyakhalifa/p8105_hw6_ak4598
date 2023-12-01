@@ -33,17 +33,17 @@ weather_df =
 fit = lm(tmax ~ tmin + prcp, data = weather_df)
 ```
 
-View output *without* uncertainty analysis
+Create desired output *without* uncertainty analysis
 
 **r^2^**
 
 ```{r}
-r2 <- fit %>% 
+fit %>% 
   broom::glance() %>%
   select(r.squared)
 ```
 
-**log(β1*β1)**
+log(β1*β1)
 
 ```{r}
 beta1 = fit %>% 
@@ -58,8 +58,9 @@ beta2 = fit %>%
   select(estimate) %>%
   as.numeric()
 
-log_betas = log(abs(beta1) * abs(beta2))
+log(abs(beta1) * abs(beta2))
 ```
+
 
 ## 2.2 Bootstrap
 
@@ -102,7 +103,9 @@ bootstrap_results %>%
   knitr::kable(digits = 3)
 ```
 
-**log(β1\*β1)**
+The table above shows the 95% confidence interval for the r^2^ term.
+
+log(β1\*β1)
 
 *Note: the log() function returns NaN if the value is negative, so here I use the absolute value of `tmin`*
 
@@ -124,5 +127,7 @@ bootstrap_results %>%
          upper = quantile(log_betas, .975)) %>%
   knitr::kable(digits = 3)
 ```
+
+The table above shows the 95% confidence interval for the log(β1\*β1) term.
 
 # Problem 3
