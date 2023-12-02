@@ -7,6 +7,7 @@ output: github_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(modelr)
 
 set.seed(1)
 ```
@@ -30,7 +31,7 @@ weather_df =
 ## 2.1 Set up regression
 
 ```{r}
-fi2t = lm(tmax ~ tmin + prcp, data = weather_df)
+fit2 = lm(tmax ~ tmin + prcp, data = weather_df)
 ```
 
 Create desired output *without* uncertainty analysis
@@ -46,7 +47,7 @@ fit2 %>%
 log(β1*β1)
 
 ```{r}
-beta1 = fi2t %>% 
+beta1 = fit2 %>% 
   broom::tidy() %>%
   filter(term == "tmin") %>%
   select(estimate) %>%
@@ -137,7 +138,7 @@ birthweight = read_csv("data/birthweight.csv") %>%
   janitor::clean_names()
 ```
 
-## Regression
+## 3.1 Regression
 
 Fit regression model that predicts baby's birth weight in `bwt`. I posit that the family' monthly income `fincome`, its gestational age in weeks `gaweeks`, mother's race `mrace`, and mother' pre-pregnancy BMI `ppbmi` predict baby's birth weight. First, I have to check the data quality in these variables and clean. All are continuous except for `mrace`, so I format that here. White will be the reference category.
 
@@ -160,16 +161,16 @@ sapply(birthweight, function(x) sum(is.na(x))/nrow(birthweight))
 Now I can fit the regression model.
 
 ```{r}
-fit3 = lm(bwt ~ fincome + gaweeks + mrace + ppbmi, 
+fit3a = lm(bwt ~ fincome + gaweeks + mrace + ppbmi, 
           data = birthweight)
 ```
 
-## Model diagnostics
+## 3.2 Model diagnostics
 
 Let's add residuals to a data frame.
 
 ```{r}
-residuals = modelr::add_residuals(birthweight, fit3) %>%
+residuals = modelr::add_residuals(birthweight, fit3a) %>%
   select(resid) %>%
   mutate(resid = as.numeric(resid)) %>%
   rowid_to_column("id")
@@ -178,7 +179,7 @@ residuals = modelr::add_residuals(birthweight, fit3) %>%
 And fitted values:
 
 ```{r}
-fitted = modelr::add_predictions(birthweight, fit3) %>% 
+fitted = modelr::add_predictions(birthweight, fit3a) %>% 
   select(pred) %>%
   mutate(pred = as.numeric(pred)) %>%
   rowid_to_column("id")
@@ -196,5 +197,63 @@ ggplot(diagnostics, aes(x = pred, y = resid)) +
        x = "Fitted value",
        y = "Residual")
 ```
+
+Since the points are around the 0-line for residuals, the relationship seems to be linear. But since the mean residual doesn't change with the fitted values, the spread of residuals is not constant. There don't seem to be any stand-out outliers.
+
+## 3.3 Cross-validation
+
+Now let's compare this model to two others.
+
+`fit3b`: length at birth and gestational age as predictors (main effects only)
+
+```{r}
+fit3b = lm(bwt ~ blength + gaweeks, data = birthweight)
+```
+
+and `fit3c`: head circumference, length, sex, and all interactions (including the three-way interaction) between these
+
+```{r}
+fit3c = lm(bwt ~ bhead + blength + babysex + 
+             bhead*babysex + blength*babysex + bhead*blength, 
+           data = birthweight)
+```
+
+We can compare the three models using cross-validated prediction error.
+
+```{r}
+cv_df = 
+  crossv_mc(birthweight, 100) %>%
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)) %>%
+  mutate(
+    fit3a = map(train, \(df) fit3a),
+    fit3b  = map(train, \(df) fit3b),
+    fit3c  = map(train, \(df) fit3c)) %>%
+  mutate(
+    rmse_a = map2_dbl(fit3a, test, \(mod, df) rmse(model = mod, data = df)),
+    rmse_b = map2_dbl(fit3b, test, \(mod, df) rmse(model = mod, data = df)),
+    rmse_c = map2_dbl(fit3c, test, \(mod, df) rmse(model = mod, data = df)))
+```
+
+We can compare the RMSEs of each visually, which gives us a picture of prediction error.
+
+```{r plot_3.2}
+cv_df %>%
+  select(starts_with("rmse")) %>%
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>%
+  mutate(model = fct_inorder(model)) %>%
+  ggplot(aes(x = model, y = rmse)) + 
+  geom_violin() + 
+  labs(title = "3-Model Comparison",
+       x = "Model",
+       y = "Root Mean Squared Errors (RMSE)")
+```
+
+According to this plot, Model C seems to be the best at predicting baby's birthweight.
 
 
