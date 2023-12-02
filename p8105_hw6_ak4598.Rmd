@@ -13,7 +13,7 @@ set.seed(1)
 
 # Problem 2
 
-```{r, include = FALSE}
+```{r import_2, include = FALSE}
 weather_df = 
   rnoaa::meteo_pull_monitors(
     c("USW00094728"),
@@ -131,3 +131,10 @@ bootstrap_results %>%
 The table above shows the 95% confidence interval for the log(β1\*β1) term.
 
 # Problem 3
+
+```{r import_3, include = FALSE}
+birthweight = read_csv("data/birthweight.csv") %>%
+  janitor::clean_names()
+```
+
+
