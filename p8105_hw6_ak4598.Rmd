@@ -30,7 +30,7 @@ weather_df =
 ## 2.1 Set up regression
 
 ```{r}
-fit = lm(tmax ~ tmin + prcp, data = weather_df)
+fi2t = lm(tmax ~ tmin + prcp, data = weather_df)
 ```
 
 Create desired output *without* uncertainty analysis
@@ -38,7 +38,7 @@ Create desired output *without* uncertainty analysis
 **r^2^**
 
 ```{r}
-fit %>% 
+fit2 %>% 
   broom::glance() %>%
   select(r.squared)
 ```
@@ -46,13 +46,13 @@ fit %>%
 log(β1*β1)
 
 ```{r}
-beta1 = fit %>% 
+beta1 = fi2t %>% 
   broom::tidy() %>%
   filter(term == "tmin") %>%
   select(estimate) %>%
   as.numeric()
 
-beta2 = fit %>% 
+beta2 = fit2 %>% 
   broom::tidy() %>%
   filter(term == "prcp") %>%
   select(estimate) %>%
@@ -135,6 +135,66 @@ The table above shows the 95% confidence interval for the log(β1\*β1) term.
 ```{r import_3, include = FALSE}
 birthweight = read_csv("data/birthweight.csv") %>%
   janitor::clean_names()
+```
+
+## Regression
+
+Fit regression model that predicts baby's birth weight in `bwt`. I posit that the family' monthly income `fincome`, its gestational age in weeks `gaweeks`, mother's race `mrace`, and mother' pre-pregnancy BMI `ppbmi` predict baby's birth weight. First, I have to check the data quality in these variables and clean. All are continuous except for `mrace`, so I format that here. White will be the reference category.
+
+```{r}
+birthweight = birthweight %>%
+  mutate(mrace = factor(mrace,
+                        levels = c(1,2,3,4),
+                        labels = c("White",
+                                      "Black",
+                                      "Asian",
+                                      "Puerto Rican")))
+```
+
+Check for missing data - none!
+
+```{r}
+sapply(birthweight, function(x) sum(is.na(x))/nrow(birthweight))
+```
+
+Now I can fit the regression model.
+
+```{r}
+fit3 = lm(bwt ~ fincome + gaweeks + mrace + ppbmi, 
+          data = birthweight)
+```
+
+## Model diagnostics
+
+Let's add residuals to a data frame.
+
+```{r}
+residuals = modelr::add_residuals(birthweight, fit3) %>%
+  select(resid) %>%
+  mutate(resid = as.numeric(resid)) %>%
+  rowid_to_column("id")
+```
+
+And fitted values:
+
+```{r}
+fitted = modelr::add_predictions(birthweight, fit3) %>% 
+  select(pred) %>%
+  mutate(pred = as.numeric(pred)) %>%
+  rowid_to_column("id")
+```
+
+Here is a plot of model residuals against fitted values.
+
+```{r plot_3.1}
+diagnostics = full_join(residuals, fitted, by = "id")
+
+
+ggplot(diagnostics, aes(x = pred, y = resid)) + 
+  geom_point(size = 2, alpha = 0.8, shape = 21, color = "blue") + 
+  labs(title = "Model fitted values vs. residuals",
+       x = "Fitted value",
+       y = "Residual")
 ```
 
 
